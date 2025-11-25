@@ -1,10 +1,14 @@
 pipeline {
-  agent { docker { image 'maven:3.9-eclipse-temurin-17' } }
-  options { buildDiscarder(logRotator(numToKeepStr: '20')) }
+  agent none
+
   stages {
-    stage('Checkout') { steps { checkout scm } }
+    stage('Checkout') {
+      agent { label 'built-in' }
+      steps { checkout scm }
+    }
 
     stage('Build & Test') {
+      agent { docker { image 'maven:3.9-eclipse-temurin-17' } }
       steps { sh 'mvn -B -DskipTests=false clean verify' }
       post {
         success {
@@ -14,14 +18,15 @@ pipeline {
       }
     }
 
-    // Rulăm docker build pe controller-ul Jenkins (are docker CLI + socket)
     stage('Package Docker Image') {
-      agent any
+      agent { label 'built-in' }     // pe controller (are docker CLI + socket)
       when { expression { fileExists('Dockerfile') } }
       steps {
+        sh 'docker version'
         sh 'docker build -t java-sample-app:${BUILD_NUMBER} .'
       }
     }
   }
+
   post { always { echo "Build #${env.BUILD_NUMBER} finished with ${currentBuild.currentResult}" } }
 }
